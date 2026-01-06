@@ -3,7 +3,9 @@ import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebas
 import { collection, addDoc, query, orderBy, getDocs, serverTimestamp, doc, deleteDoc, setDoc, getDoc } from "firebase/firestore";
 
 // --- KONFIGURASI DAN VARIABEL ---
+// KEMBALIKAN KE MODE AMAN: Ambil dari file .env
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+
 let allMaterials = [];
 let currentUser = null;
 
@@ -11,6 +13,11 @@ let currentUser = null;
 document.addEventListener('DOMContentLoaded', () => {
     console.log("Aplikasi dimulai...");
     
+    // Cek apakah API Key terbaca
+    if (!GEMINI_API_KEY) {
+        console.error("CRITICAL: VITE_GEMINI_API_KEY tidak ditemukan. Pastikan file .env ada dan server direstart.");
+    }
+
     // 1. Load Data
     loadMaterials();
     setupAuthListener();
@@ -89,8 +96,8 @@ async function loadMaterials() {
         const errorMsg = `<div style="text-align:center; padding: 40px; color: var(--danger);">
             <i class="fa-solid fa-triangle-exclamation" style="font-size: 2rem; margin-bottom: 10px;"></i><br>
             Gagal memuat data.<br>
-            <small>Cek koneksi internet atau konfigurasi API Key di .env</small><br>
-            <small style="color:#999;">Error: ${e.message}</small>
+            <small>Error: ${e.message}</small><br>
+            <small style="color:#999;">Cek console untuk detail.</small>
         </div>`;
         
         const featContainer = document.getElementById('featured-container');
@@ -343,7 +350,8 @@ async function checkAndTriggerAI() {
 
         // Cek jika API Key ada
         if (!GEMINI_API_KEY) {
-            console.warn("AI Daily Skip: API Key tidak ditemukan.");
+            console.warn("AI Daily Skip: API Key tidak ditemukan. Pastikan .env sudah dibuat.");
+            // Tidak perlu throw error agar halaman tetap jalan, cuma fitur AI saja yang mati
             return;
         }
 
@@ -357,7 +365,7 @@ async function checkAndTriggerAI() {
 
 async function callGeminiAI(topic, isDaily = false) {
     if(!GEMINI_API_KEY) {
-        alert("API Key AI belum disetting di .env!");
+        alert("Gagal: API Key AI belum disetting di .env!");
         return;
     }
 
