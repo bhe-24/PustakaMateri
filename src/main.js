@@ -9,6 +9,8 @@ let currentUser = null;
 
 // --- EVENT LISTENER UTAMA (SAAT WEB DIMUAT) ---
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("Aplikasi dimulai...");
+    
     // 1. Load Data
     loadMaterials();
     setupAuthListener();
@@ -29,12 +31,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // 3. Setup Klik Kartu (Event Delegation)
-    // Ini teknik agar kartu yang baru muncul dari database tetap bisa diklik
     document.body.addEventListener('click', (e) => {
-        // Cek apakah yang diklik adalah kartu materi/artikel
         const card = e.target.closest('.featured-card, .material-card');
         if (card && card.dataset.id) {
-            // Jangan buka detail jika yang diklik tombol hapus/edit
             if (!e.target.closest('.action-btn')) {
                 openDetail(card.dataset.id);
             }
@@ -42,39 +41,63 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // 4. Setup Tombol Navigasi Lainnya
-    document.getElementById('logo-refresh').addEventListener('click', () => location.reload());
+    const refreshBtn = document.getElementById('logo-refresh');
+    if(refreshBtn) refreshBtn.addEventListener('click', () => location.reload());
     
-    document.getElementById('btn-close-detail').addEventListener('click', () => {
+    const closeDetailBtn = document.getElementById('btn-close-detail');
+    if(closeDetailBtn) closeDetailBtn.addEventListener('click', () => {
         document.getElementById('detail-view').classList.add('hidden');
         document.getElementById('public-view').classList.remove('hidden');
         window.scrollTo(0,0);
     });
 
-    document.getElementById('btn-close-archive').addEventListener('click', () => {
+    const closeArchiveBtn = document.getElementById('btn-close-archive');
+    if(closeArchiveBtn) closeArchiveBtn.addEventListener('click', () => {
         document.getElementById('archive-view').classList.add('hidden');
         document.getElementById('public-view').classList.remove('hidden');
     });
 
-    document.getElementById('hide-admin-panel').addEventListener('click', () => {
+    const hideAdminBtn = document.getElementById('hide-admin-panel');
+    if(hideAdminBtn) hideAdminBtn.addEventListener('click', () => {
         document.getElementById('admin-panel').style.display = 'none';
     });
 
-    document.getElementById('btn-open-archive').addEventListener('click', openArchive);
+    const openArchiveBtn = document.getElementById('btn-open-archive');
+    if(openArchiveBtn) openArchiveBtn.addEventListener('click', openArchive);
 });
 
 // --- FUNGSI LOGIKA UTAMA ---
 
 async function loadMaterials() {
+    console.log("Mengambil data dari Firebase...");
     try {
         const q = query(collection(db, 'materials'), orderBy('createdAt', 'desc'));
         const snap = await getDocs(q);
-        allMaterials = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        if (snap.empty) {
+            console.log("Tidak ada data ditemukan di database.");
+            allMaterials = [];
+        } else {
+            allMaterials = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            console.log(`Berhasil memuat ${allMaterials.length} materi.`);
+        }
+        
         renderPage();
     } catch (e) {
-        console.error("Gagal memuat data:", e);
-        // Jika error (mungkin karena belum setup env), tampilkan pesan
-        document.getElementById('featured-container').innerHTML = 
-            `<div style="color:red; text-align:center;">Gagal memuat data. Pastikan koneksi internet lancar dan konfigurasi .env sudah benar.</div>`;
+        console.error("Gagal memuat data (Error Kritis):", e);
+        // Tampilkan pesan error di layar agar user tahu
+        const errorMsg = `<div style="text-align:center; padding: 40px; color: var(--danger);">
+            <i class="fa-solid fa-triangle-exclamation" style="font-size: 2rem; margin-bottom: 10px;"></i><br>
+            Gagal memuat data.<br>
+            <small>Cek koneksi internet atau konfigurasi API Key di .env</small><br>
+            <small style="color:#999;">Error: ${e.message}</small>
+        </div>`;
+        
+        const featContainer = document.getElementById('featured-container');
+        if(featContainer) featContainer.innerHTML = errorMsg;
+        
+        const libContainer = document.getElementById('library-container');
+        if(libContainer) libContainer.innerHTML = errorMsg;
     }
 }
 
@@ -84,20 +107,29 @@ function renderPage() {
     
     if(!container) return;
 
-    // Perhatikan: Saya menambahkan data-id="${item.id}" ke div utama
-    container.innerHTML = articles.map(item => `
-        <div class="featured-card" data-id="${item.id}">
-            ${renderAdminActions(item)}
-            <div class="featured-img" style="background-image: url('${item.imageUrl || ''}')">
-                ${!item.imageUrl ? '<div class="featured-icon-fallback"><i class="fa-solid fa-feather"></i></div>' : ''}
-                <span class="badge">${item.topic || 'Sastra'}</span>
+    // CEK: Jika tidak ada artikel, tampilkan pesan kosong, JANGAN biarkan kosong/freeze
+    if (articles.length === 0) {
+        container.innerHTML = `
+            <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-light); background: #fff; border-radius: 12px; border: 1px dashed #ccc;">
+                <i class="fa-regular fa-folder-open" style="font-size: 2rem; margin-bottom: 10px;"></i><br>
+                Belum ada kabar terbaru hari ini.
             </div>
-            <div class="featured-content">
-                <div class="featured-date">${formatDate(item.createdAt)}</div>
-                <h3 class="featured-title">${item.title}</h3>
+        `;
+    } else {
+        container.innerHTML = articles.map(item => `
+            <div class="featured-card" data-id="${item.id}">
+                ${renderAdminActions(item)}
+                <div class="featured-img" style="background-image: url('${item.imageUrl || ''}')">
+                    ${!item.imageUrl ? '<div class="featured-icon-fallback"><i class="fa-solid fa-feather"></i></div>' : ''}
+                    <span class="badge">${item.topic || 'Sastra'}</span>
+                </div>
+                <div class="featured-content">
+                    <div class="featured-date">${formatDate(item.createdAt)}</div>
+                    <h3 class="featured-title">${item.title}</h3>
+                </div>
             </div>
-        </div>
-    `).join('');
+        `).join('');
+    }
     
     // Default filter
     filterMaterials('all');
@@ -110,7 +142,15 @@ function filterMaterials(f) {
     const libContainer = document.getElementById('library-container');
     if(!libContainer) return;
 
-    // Perhatikan: Saya menambahkan data-id="${item.id}"
+    if (items.length === 0) {
+        libContainer.innerHTML = `
+            <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-light);">
+                Tidak ada materi untuk kategori ini.
+            </div>
+        `;
+        return;
+    }
+
     libContainer.innerHTML = items.map(item => `
         <div class="material-card" data-id="${item.id}">
             ${renderAdminActions(item)}
@@ -152,15 +192,19 @@ function openArchive() {
         groups[key].push(a);
     });
     
-    // Gunakan data-id juga di sini
-    document.getElementById('archive-content').innerHTML = Object.keys(groups).map(k => `
-        <div style="margin-bottom:30px;"><h3 style="color:var(--primary); border-bottom:1px solid #ddd;">${k}</h3>
-        <div class="featured-grid">${groups[k].map(i => `
-            <div class="featured-card" data-id="${i.id}">
-                <div class="featured-content"><h3>${i.title}</h3></div>
-            </div>`).join('')}
-        </div></div>
-    `).join('');
+    const archiveContent = document.getElementById('archive-content');
+    if (Object.keys(groups).length === 0) {
+        archiveContent.innerHTML = '<p style="text-align:center; color:#666;">Belum ada arsip artikel.</p>';
+    } else {
+        archiveContent.innerHTML = Object.keys(groups).map(k => `
+            <div style="margin-bottom:30px;"><h3 style="color:var(--primary); border-bottom:1px solid #ddd;">${k}</h3>
+            <div class="featured-grid">${groups[k].map(i => `
+                <div class="featured-card" data-id="${i.id}">
+                    <div class="featured-content"><h3>${i.title}</h3></div>
+                </div>`).join('')}
+            </div></div>
+        `).join('');
+    }
     
     document.getElementById('public-view').classList.add('hidden');
     document.getElementById('archive-view').classList.remove('hidden');
@@ -207,13 +251,15 @@ function setupAuthListener() {
         if (user && user.email.endsWith('@ac.id')) {
             panel.style.display = 'block';
             authSection.innerHTML = `<div class="admin-trigger" id="logout-btn">Keluar (${user.email})</div>`;
-            document.getElementById('logout-btn').addEventListener('click', () => {
+            const logoutBtn = document.getElementById('logout-btn');
+            if(logoutBtn) logoutBtn.addEventListener('click', () => {
                 signOut(auth).then(()=>location.reload());
             });
         } else {
             panel.style.display = 'none';
             authSection.innerHTML = `<div class="admin-trigger" id="login-modal-trigger"><i class="fa-solid fa-lock"></i> Akses Pengajar</div>`;
-            document.getElementById('login-modal-trigger').addEventListener('click', () => {
+            const loginTrigger = document.getElementById('login-modal-trigger');
+            if(loginTrigger) loginTrigger.addEventListener('click', () => {
                 document.getElementById('login-modal').classList.add('show');
             });
         }
@@ -275,9 +321,12 @@ if(btnAiManual) {
     };
 }
 
-document.getElementById('input-category').onchange = function() { 
-    document.getElementById('video-url-group').style.display = this.value === 'Video' ? 'block' : 'none'; 
-};
+const catInput = document.getElementById('input-category');
+if(catInput) {
+    catInput.onchange = function() { 
+        document.getElementById('video-url-group').style.display = this.value === 'Video' ? 'block' : 'none'; 
+    };
+}
 
 // --- LOGIC AI ---
 
@@ -285,12 +334,18 @@ async function checkAndTriggerAI() {
     const statusBox = document.getElementById('ai-status-container');
     const today = new Date().toLocaleDateString('en-CA');
     const now = new Date();
-    if (now.getHours() < 9) return; 
+    // if (now.getHours() < 9) return; // Komentari ini dulu untuk test
 
     try {
         const aiLogRef = doc(db, 'system', 'ai_publish_log');
         const aiLogSnap = await getDoc(aiLogRef);
         if (aiLogSnap.exists() && aiLogSnap.data().lastDate === today) return;
+
+        // Cek jika API Key ada
+        if (!GEMINI_API_KEY) {
+            console.warn("AI Daily Skip: API Key tidak ditemukan.");
+            return;
+        }
 
         statusBox.innerHTML = `<div class="ai-indicator"><i class="fa-solid fa-feather fa-bounce"></i> Aksa AI sedang membedah sebuah novel untuk materi pagi ini...</div>`;
         await callGeminiAI("Teknik menulis novel secara umum untuk pemula", true);
@@ -337,7 +392,7 @@ async function callGeminiAI(topic, isDaily = false) {
         loadMaterials();
     } catch (err) {
         console.error("AI Error:", err);
-        if (!isDaily) alert("Gagal memanggil Aksa AI.");
+        if (!isDaily) alert("Gagal memanggil Aksa AI: " + err.message);
     } finally {
         const statusBox = document.getElementById('ai-status-container');
         if(statusBox) statusBox.innerHTML = '';
