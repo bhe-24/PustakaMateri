@@ -16,12 +16,13 @@
 
     <header>
         <div class="nav-container">
-            <a href="#" class="logo" onclick="location.reload()">
+            <a href="#" class="logo" id="logo-refresh">
                 <i class="fa-solid fa-feather-pointed"></i>
                 <span>Cendekia Aksara</span>
             </a>
             <div id="auth-section">
-                <div class="admin-trigger" id="login-btn"><i class="fa-solid fa-lock"></i> Akses Pengajar</div>
+                <!-- Tombol Login akan diisi oleh JS -->
+                <div class="admin-trigger" id="login-btn-placeholder"><i class="fa-solid fa-lock"></i> Memuat...</div>
             </div>
         </div>
     </header>
@@ -90,6 +91,7 @@
         <h2 class="section-title">
             <span><i class="fa-regular fa-newspaper"></i> Kabar Cendekia</span>
         </h2>
+        <!-- Tambahkan ID agar JS bisa mendeteksi klik pada kartu -->
         <div class="featured-grid" id="featured-container">
             <div style="text-align: center; padding: 40px; color: #999;">Memuat Kabar...</div>
         </div>
@@ -101,23 +103,26 @@
         <h2 class="section-title">
             <span><i class="fa-solid fa-book-journal-whills"></i> Pustaka Materi & Bedah Novel</span>
         </h2>
-        <div class="filter-bar">
-            <!-- Fungsi onclick ini akan di-handle oleh window function di main.js -->
-            <button class="filter-btn active" onclick="filterMaterials('all')">Semua Materi</button>
-            <button class="filter-btn" onclick="filterMaterials('Video')">Bedah Video</button>
-            <button class="filter-btn" onclick="filterMaterials('Bacaan')">Analisis Teks</button>
+        
+        <div class="filter-bar" id="filter-container">
+            <!-- HAPUS onclick, ganti dengan data-filter -->
+            <button class="filter-btn active" data-filter="all">Semua Materi</button>
+            <button class="filter-btn" data-filter="Video">Bedah Video</button>
+            <button class="filter-btn" data-filter="Bacaan">Analisis Teks</button>
         </div>
+
+        <!-- Tambahkan ID agar JS bisa mendeteksi klik pada kartu -->
         <div class="material-list" id="library-container"></div>
     </div>
 
     <div id="archive-view" class="container hidden">
-        <div onclick="closeArchive()" class="back-btn"><i class="fa-solid fa-arrow-left"></i> Kembali</div>
+        <div id="btn-close-archive" class="back-btn"><i class="fa-solid fa-arrow-left"></i> Kembali</div>
         <h1 class="detail-title">Arsip Artikel & Kegiatan</h1>
         <div id="archive-content"></div>
     </div>
 
     <div id="detail-view" class="container hidden">
-        <div onclick="closeDetail()" class="back-btn"><i class="fa-solid fa-arrow-left"></i> Kembali</div>
+        <div id="btn-close-detail" class="back-btn"><i class="fa-solid fa-arrow-left"></i> Kembali</div>
         <div id="view-content-rendered"></div>
     </div>
 
