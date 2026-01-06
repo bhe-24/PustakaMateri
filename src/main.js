@@ -3,41 +3,33 @@ import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebas
 import { collection, addDoc, query, orderBy, getDocs, serverTimestamp, doc, deleteDoc, setDoc, getDoc } from "firebase/firestore";
 
 // --- KONFIGURASI DAN VARIABEL ---
-// KEMBALIKAN KE MODE AMAN: Ambil dari file .env
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 let allMaterials = [];
 let currentUser = null;
 
-// --- EVENT LISTENER UTAMA (SAAT WEB DIMUAT) ---
+// --- EVENT LISTENER UTAMA ---
 document.addEventListener('DOMContentLoaded', () => {
     console.log("Aplikasi dimulai...");
     
-    // Cek apakah API Key terbaca
     if (!GEMINI_API_KEY) {
         console.error("CRITICAL: VITE_GEMINI_API_KEY tidak ditemukan. Pastikan file .env ada dan server direstart.");
     }
 
-    // 1. Load Data
     loadMaterials();
     setupAuthListener();
     checkAndTriggerAI(); 
 
-    // 2. Setup Tombol Filter (Event Listener)
     const filterBtns = document.querySelectorAll('.filter-btn');
     filterBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
-            // Hapus kelas active dari semua tombol
             filterBtns.forEach(b => b.classList.remove('active'));
-            // Tambah kelas active ke tombol yang diklik
             e.target.classList.add('active');
-            // Jalankan filter
             const filterType = e.target.getAttribute('data-filter');
             filterMaterials(filterType);
         });
     });
 
-    // 3. Setup Klik Kartu (Event Delegation)
     document.body.addEventListener('click', (e) => {
         const card = e.target.closest('.featured-card, .material-card');
         if (card && card.dataset.id) {
@@ -47,7 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 4. Setup Tombol Navigasi Lainnya
     const refreshBtn = document.getElementById('logo-refresh');
     if(refreshBtn) refreshBtn.addEventListener('click', () => location.reload());
     
@@ -76,35 +67,22 @@ document.addEventListener('DOMContentLoaded', () => {
 // --- FUNGSI LOGIKA UTAMA ---
 
 async function loadMaterials() {
-    console.log("Mengambil data dari Firebase...");
     try {
         const q = query(collection(db, 'materials'), orderBy('createdAt', 'desc'));
         const snap = await getDocs(q);
         
         if (snap.empty) {
-            console.log("Tidak ada data ditemukan di database.");
+            console.log("Database kosong.");
             allMaterials = [];
         } else {
             allMaterials = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            console.log(`Berhasil memuat ${allMaterials.length} materi.`);
         }
-        
         renderPage();
     } catch (e) {
-        console.error("Gagal memuat data (Error Kritis):", e);
-        // Tampilkan pesan error di layar agar user tahu
-        const errorMsg = `<div style="text-align:center; padding: 40px; color: var(--danger);">
-            <i class="fa-solid fa-triangle-exclamation" style="font-size: 2rem; margin-bottom: 10px;"></i><br>
-            Gagal memuat data.<br>
-            <small>Error: ${e.message}</small><br>
-            <small style="color:#999;">Cek console untuk detail.</small>
-        </div>`;
-        
+        console.error("Gagal memuat data:", e);
+        const errorMsg = `<div style="text-align:center; padding: 40px; color: var(--danger);">Gagal memuat data: ${e.message}</div>`;
         const featContainer = document.getElementById('featured-container');
         if(featContainer) featContainer.innerHTML = errorMsg;
-        
-        const libContainer = document.getElementById('library-container');
-        if(libContainer) libContainer.innerHTML = errorMsg;
     }
 }
 
@@ -114,12 +92,11 @@ function renderPage() {
     
     if(!container) return;
 
-    // CEK: Jika tidak ada artikel, tampilkan pesan kosong, JANGAN biarkan kosong/freeze
     if (articles.length === 0) {
         container.innerHTML = `
             <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-light); background: #fff; border-radius: 12px; border: 1px dashed #ccc;">
                 <i class="fa-regular fa-folder-open" style="font-size: 2rem; margin-bottom: 10px;"></i><br>
-                Belum ada kabar terbaru hari ini.
+                Belum ada kabar terbaru.
             </div>
         `;
     } else {
@@ -137,8 +114,6 @@ function renderPage() {
             </div>
         `).join('');
     }
-    
-    // Default filter
     filterMaterials('all');
 }
 
@@ -150,11 +125,7 @@ function filterMaterials(f) {
     if(!libContainer) return;
 
     if (items.length === 0) {
-        libContainer.innerHTML = `
-            <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-light);">
-                Tidak ada materi untuk kategori ini.
-            </div>
-        `;
+        libContainer.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-light);">Tidak ada materi.</div>`;
         return;
     }
 
@@ -201,7 +172,7 @@ function openArchive() {
     
     const archiveContent = document.getElementById('archive-content');
     if (Object.keys(groups).length === 0) {
-        archiveContent.innerHTML = '<p style="text-align:center; color:#666;">Belum ada arsip artikel.</p>';
+        archiveContent.innerHTML = '<p style="text-align:center; color:#666;">Belum ada arsip.</p>';
     } else {
         archiveContent.innerHTML = Object.keys(groups).map(k => `
             <div style="margin-bottom:30px;"><h3 style="color:var(--primary); border-bottom:1px solid #ddd;">${k}</h3>
@@ -212,25 +183,19 @@ function openArchive() {
             </div></div>
         `).join('');
     }
-    
     document.getElementById('public-view').classList.add('hidden');
     document.getElementById('archive-view').classList.remove('hidden');
 }
 
-// --- FUNGSI ADMIN & TOMBOL ---
-
 function renderAdminActions(item) {
     if (!currentUser) return '';
-    // Tambahkan class khusus untuk tombol delete/edit
     return `<div class="admin-actions">
         <button class="action-btn btn-edit" style="background:white; color:var(--primary)"><i class="fa-solid fa-pen"></i></button>
         <button class="action-btn btn-delete" style="background:white; color:var(--danger)"><i class="fa-solid fa-trash"></i></button>
     </div>`;
 }
 
-// Logic untuk menangani klik tombol edit/delete
 document.body.addEventListener('click', async (e) => {
-    // Handle Delete
     if (e.target.closest('.btn-delete')) {
         const card = e.target.closest('.featured-card, .material-card');
         const id = card.dataset.id;
@@ -241,14 +206,12 @@ document.body.addEventListener('click', async (e) => {
             } catch (err) { alert(err.message); }
         }
     }
-    // Handle Edit (Placeholder)
     if (e.target.closest('.btn-edit')) {
         const card = e.target.closest('.featured-card, .material-card');
         alert("Edit ID: " + card.dataset.id + " (Fitur edit akan segera hadir)");
     }
 });
 
-// --- AUTHENTICATION ---
 function setupAuthListener() {
     onAuthStateChanged(auth, user => {
         currentUser = user;
@@ -270,12 +233,10 @@ function setupAuthListener() {
                 document.getElementById('login-modal').classList.add('show');
             });
         }
-        // Re-render page to show admin buttons
         if(allMaterials.length > 0) renderPage();
     });
 }
 
-// --- FORM HANDLERS ---
 const loginForm = document.getElementById('login-form');
 if(loginForm) {
     loginForm.onsubmit = async e => {
@@ -335,23 +296,21 @@ if(catInput) {
     };
 }
 
-// --- LOGIC AI ---
+// --- LOGIC AI UTAMA ---
 
 async function checkAndTriggerAI() {
     const statusBox = document.getElementById('ai-status-container');
     const today = new Date().toLocaleDateString('en-CA');
     const now = new Date();
-    // if (now.getHours() < 9) return; // Komentari ini dulu untuk test
+    // if (now.getHours() < 9) return; // Uncomment untuk live production
 
     try {
         const aiLogRef = doc(db, 'system', 'ai_publish_log');
         const aiLogSnap = await getDoc(aiLogRef);
         if (aiLogSnap.exists() && aiLogSnap.data().lastDate === today) return;
 
-        // Cek jika API Key ada
         if (!GEMINI_API_KEY) {
-            console.warn("AI Daily Skip: API Key tidak ditemukan. Pastikan .env sudah dibuat.");
-            // Tidak perlu throw error agar halaman tetap jalan, cuma fitur AI saja yang mati
+            console.warn("AI Daily Skip: API Key tidak ditemukan.");
             return;
         }
 
@@ -376,6 +335,7 @@ async function callGeminiAI(topic, isDaily = false) {
     Berikan contoh 'Bedah Kutipan' dari sebuah novel terkenal. Penulis: Aksa AI.`;
     
     try {
+        // MENGGUNAKAN MODEL PREVIEW (Biasanya lebih lancar untuk percobaan awal)
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`, {
             method: 'POST',
             body: JSON.stringify({
@@ -385,6 +345,18 @@ async function callGeminiAI(topic, isDaily = false) {
         });
         
         const data = await res.json();
+        
+        // --- ERROR HANDLING EXTRA KUAT ---
+        // Kita cek dulu apakah data valid, sebelum coba akses 'candidates'
+        if (data.error) {
+            throw new Error(`API Error: ${data.error.message}`);
+        }
+        
+        if (!data.candidates || data.candidates.length === 0) {
+            console.log("Full AI Response:", data); // Lihat log browser untuk detail
+            throw new Error("AI tidak memberikan jawaban (Safety/Blocked). Coba topik lain.");
+        }
+
         const result = data.candidates[0].content.parts[0].text;
         const lines = result.split('\n');
         const title = lines[0].replace(/#|\*/g, '').trim();
